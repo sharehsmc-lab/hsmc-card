@@ -219,6 +219,7 @@ var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source"
 (function () {
   var CFG = window.__HSMC_TEST || {};
   var FONT_BASE = CFG.fontBase || 'https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/public/static/alternative/';
+  var API_URL = CFG.apiUrl || 'https://script.google.com/macros/s/AKfycbxqSTEsWrHT6pu5-JledMl1L92k813_9jyYD9dKSPdEEYm4bVNCWLF0TuTN3yxekJvWpA/exec';
   var FONTKIT_URLS = CFG.fontkitUrls || ['https://cdn.jsdelivr.net/npm/fontkit@2.0.4/+esm', 'https://esm.sh/fontkit@2.0.4'];
 
   var ORGS = [
@@ -253,13 +254,16 @@ var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source"
 
   // ── 유틸
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function call(fn) {
-    var args = [].slice.call(arguments, 1);
-    return new Promise(function (res, rej) {
-      var r = google.script.run.withSuccessHandler(res).withFailureHandler(rej);
-      r[fn].apply(r, [AUTH].concat(args));
-    });
+  // 구글 Apps Script(/exec)로 요청. text/plain으로 보내 별도 사전 확인 없이 전송, 쿠키는 보내지 않음
+  function api(action, auth, args) {
+    return fetch(API_URL, {
+      method: 'POST', redirect: 'follow', credentials: 'omit',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: action, auth: auth, args: args || [] })
+    }).then(function (r) { if (!r.ok) throw new Error('연결 오류 ' + r.status); return r.json(); })
+      .then(function (j) { if (!j.ok) throw new Error(j.error || '처리하지 못했어요.'); return j.data; });
   }
+  function call(fn) { return api(fn, AUTH, [].slice.call(arguments, 1)); }
   function convLast(s) { return (s || '').replace(/[\s\-]/g, '').toUpperCase(); }
   function convFirst(s) { var t = (s || '').replace(/[\s\-]/g, ''); return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : ''; }
   function fmtMobile(m) {
@@ -659,16 +663,17 @@ var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source"
     if (LOGIN.busy || !canNext()) return;
     var cred = { id: LOGIN.id.trim(), pw: LOGIN.pw };
     LOGIN.busy = true; S.error = ''; render();
-    google.script.run.withSuccessHandler(function (d) {
+    api('login', cred).then(function (d) {
       AUTH = cred; LOGIN.busy = false; applyInit(d);
       try { sessionStorage.setItem('hsmc_auth', JSON.stringify(cred)); } catch (e) {}
       go('reason');
-    }).withFailureHandler(function (err) {
+    }).catch(function (err) {
       LOGIN.busy = false; LOGIN.pw = '';
-      S.error = (err && err.message && err.message.indexOf('아이디') >= 0) ? '아이디 또는 비밀번호가 맞지 않아요.' : '연결이 원활하지 않아요. 잠시 후 다시 시도해 주세요.';
+      var m = (err && err.message) || '';
+      S.error = (m.indexOf('아이디') >= 0 || m.indexOf('잠겼') >= 0) ? m : '연결이 원활하지 않아요. 잠시 후 다시 시도해 주세요.';
       render();
       var pw = document.getElementById('login_pw'); if (pw) pw.focus();
-    }).login(cred);
+    });
   }
   panel.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && S.screen === 'login' && e.target.closest && e.target.closest('input')) { e.preventDefault(); doLogin(); }
@@ -679,12 +684,12 @@ var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source"
     var saved = null;
     try { saved = JSON.parse(sessionStorage.getItem('hsmc_auth') || 'null'); } catch (e) {}
     if (!saved) return;
-    google.script.run.withSuccessHandler(function (d) {
+    api('login', saved).then(function (d) {
       AUTH = saved; applyInit(d);
       if (S.screen === 'login') go('reason');
-    }).withFailureHandler(function () {
+    }).catch(function () {
       try { sessionStorage.removeItem('hsmc_auth'); } catch (e) {}
-    }).login(saved);
+    });
   })();
   render();
   startIntro();
