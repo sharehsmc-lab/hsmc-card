@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HSMC 명함 만들기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@cantoo/pdf-lib@2.9.2/dist/pdf-lib.min.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#F2F4F6;color:#191F28;font-family:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid #3182F6;outline-offset:2px}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes fill{from{width:0}to{width:100%}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.page{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px 16px}
+.panel{position:relative;width:400px;max-width:100%;height:760px;max-height:calc(100vh - 48px);background:#fff;border-radius:24px;box-shadow:0 8px 32px rgba(25,31,40,.12);overflow:hidden;display:flex;flex-direction:column}
+.main{flex:1;min-height:0;overflow-y:auto;padding:36px 24px 16px;display:flex;flex-direction:column;gap:24px}
+.foot{display:flex;gap:12px;padding:12px 24px 24px}
+.foot>div{flex:1 1 0;min-width:0}
+h1{margin:0;font-size:24px;line-height:1.4;font-weight:700;text-wrap:pretty}
+.stack{display:flex;flex-direction:column;gap:12px}
+.stack20{display:flex;flex-direction:column;gap:20px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:56px;padding:0 12px;border:0;border-radius:14px;font-size:16px;font-weight:700;line-height:1.3;transition:background .12s,transform .12s,opacity .12s}
+.btn-primary{background:#3182F6;color:#fff}
+.btn-primary:hover:not(:disabled){background:#2E7AE7}
+.btn-primary:active:not(:disabled),.btn-primary.is-loading{background:#2B72D8}
+.btn-primary:active:not(:disabled){transform:scale(.98)}
+.btn-secondary{background:#E5E8EB;color:#333D4B}
+.btn-secondary:hover:not(:disabled){background:#D7DADD}
+.btn-secondary:active:not(:disabled){background:#CACCCF;transform:scale(.98)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary.is-loading:disabled{opacity:1;cursor:progress}
+.spin{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+.field{display:flex;align-items:center;gap:8px;width:100%;height:56px;padding:0 16px;border:1.5px solid #E5E8EB;border-radius:12px;background:#fff;transition:border-color .12s}
+.field:focus-within{border-color:#3182F6}
+.field input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;font:inherit;font-size:17px;color:#191F28}
+.field input::placeholder{color:#6B7684}
+.field input:disabled{color:#4E5968;-webkit-text-fill-color:#4E5968}
+.field.locked{background:#E5E8EB;border-color:#E5E8EB}
+.field .suffix{font-size:17px;color:#4E5968;white-space:nowrap}
+button.field{justify-content:space-between;text-align:left;font-size:17px;color:#191F28}
+.lbl{display:block;margin-bottom:8px;font-size:14px;font-weight:500;color:#4E5968}
+.choice{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:64px;padding:12px 20px;border:1.5px solid #E5E8EB;border-radius:14px;background:#fff;font-size:17px;font-weight:500;color:#191F28;text-align:left;transition:background .12s,border-color .12s,transform .12s}
+.choice:hover{background:#F9FAFB}
+.choice:active{transform:scale(.99)}
+.choice.sel{border-color:#3182F6;background:#EAF2FE}
+.seg{flex:1;height:40px;border:0;border-radius:10px;background:transparent;font-size:15px;font-weight:500;color:#4E5968}
+.seg.sel{background:#fff;color:#191F28;font-weight:700;box-shadow:0 1px 3px rgba(25,31,40,.12)}
+.linkbtn{padding:4px 0;border:0;background:transparent;font-size:15px;font-weight:500;color:#1B64DA;text-decoration:underline;text-underline-offset:3px;text-align:left}
+.hint{font-size:13px;color:#6B7684}
+.preview{font-size:14px;font-weight:500;color:#1B64DA}
+.err{font-size:14px;color:#B42318}
+.alert{padding:12px 14px;border-radius:10px;background:#FDECEA;color:#B42318;font-size:14px;font-weight:500}
+.sub{font-size:14px;font-weight:400;color:#4E5968}
+.intro{position:relative;flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:0 32px}
+.sheet{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet .scrim{position:absolute;inset:0;border:0;background:rgba(25,31,40,.5);cursor:default}
+.sheet .body{position:relative;display:flex;flex-direction:column;gap:10px;padding:24px;background:#fff;border-radius:24px 24px 0 0}
+.cardbox{position:relative;width:352px;max-width:100%;height:196px;overflow:hidden;border-radius:8px;background:#fff;box-shadow:0 0 0 1px #E5E8EB,0 4px 16px rgba(25,31,40,.08);cursor:zoom-in}
+.card{position:absolute;left:0;top:0;width:450px;height:250px;overflow:hidden;transform-origin:0 0;transition:transform .08s linear}
+.card .t{position:absolute;white-space:nowrap;line-height:1}
+.caption{font-size:13px;color:#4E5968}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+/* ===== 명함 디자인 설계도 (card-layout.json) ===== */
+var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source":"1019_BC_Layout.ai (2026-10-19) 에서 수치 추출","units":"mm. x는 재단선 왼쪽 기준, y는 재단선 위쪽 기준 '글자 기준선(baseline)' 위치. 글자 크기는 pt, 자간(tracking)은 1/1000em (일러스트레이터 자간 값과 동일)","variantRule":"명함 디자인=화이트 → white / 블랙이면서 영문 직책 2가 있으면 → black + twoLineTitle / 그 외 → black"},"page":{"trim":{"w":90,"h":50},"bleed":1,"cropMarks":{"enabled":true,"offset":2,"length":3,"strokePt":0.25,"color":"registration"},"note":"cropMarks.enabled=false 이면 문서 크기 92x52mm(재단선 없음). true면 재단선 자리만큼 문서가 커지고, 재단·도련 영역은 PDF TrimBox/BleedBox에 기록"},"colors":{"ink":{"cmyk":[20,0,0,100],"use":"블랙 명함 배경 / 화이트 명함 글자·선·로고"},"paperWhite":{"cmyk":[0,0,0,0],"use":"블랙 명함 글자·선·로고(SMC)"},"logoGray":{"cmyk":[28.1,22.6,20.3,0],"use":"로고 H 부분 (앞·뒷면 공통)"},"richBlack":{"cmyk":[92.9,87.9,89,80],"use":"뒷면 로고 SMC"},"registration":{"cmyk":[100,100,100,100],"use":"재단선"}},"fonts":{"family":"Pretendard","files":{"Light":"Pretendard-Light.ttf","Regular":"Pretendard-Regular.ttf","Medium":"Pretendard-Medium.ttf","SemiBold":"Pretendard-SemiBold.ttf","Bold":"Pretendard-Bold.ttf","ExtraBold":"Pretendard-ExtraBold.ttf"}},"logo":{"unit":"pt","width":214.135,"height":51.981,"parts":{"h":"M32.744 1.327L32.744 20.924L12.83 20.924L12.83 31.057L32.744 31.057L32.744 50.654L45.621 50.654L45.621 1.327L32.744 1.327Z M0 1.369H12.831V20.945H0Z M0 31.078H12.831V50.654H0Z","smc":"M67.66 34.991C68.513 39.257 72.449 41.422 77.07 41.422C81.407 41.422 84.981 40.174 84.981 37.331C84.981 34.131 81.265 32.923 73.515 31.074C59.083 27.59 56.168 22.329 56.168 15.717C56.168 7.47 62.211 0.574 75.862 0.574C90.01 0.574 95.84 8.459 96.48 16.137L83.566 16.137C83.21 13.507 80.91 10.559 75.791 10.559C72.52 10.559 69.263 11.451 69.263 14.082C69.263 16.784 72.307 17.779 79.843 19.628C94.916 23.396 97.973 28.87 97.973 35.838C97.973 45.009 90.863 51.408 76.502 51.408C62.922 51.408 55.741 44.447 54.675 34.991L67.66 34.991Z M143.817 34.487C143.817 26.88 144.03 16.997 144.243 11.167L143.817 11.167C141.826 21.69 138.484 36.193 134.93 50.484L123.412 50.484C120.639 36.62 117.369 22.045 115.52 11.167L115.023 11.167C115.449 16.926 115.733 26.524 115.733 34.913L115.733 50.484L102.936 50.484L102.936 1.498L123.625 1.498C126.043 11.451 128.815 25.813 129.953 33.065L130.166 33.065C131.446 25.173 134.717 12.162 137.56 1.498L157.61 1.498L157.61 50.484L143.817 50.484L143.817 34.487Z M188.777 39.761C180.813 39.761 175.037 33.316 175.037 26.021C175.037 18.725 180.813 12.28 188.777 12.28C194.368 12.28 198.944 15.399 201.119 19.775L214.085 19.775C211.451 8.698 201.075 0 188.777 0C174.186 0 162.756 12.098 162.756 26.021C162.756 39.943 174.186 51.981 188.777 51.981C201.113 51.981 211.483 43.306 214.135 32.206L201.115 32.206C198.95 36.615 194.407 39.761 188.777 39.761Z"}},"back":{"background":null,"logo":{"x":7.23,"top":29.0,"width":75.54,"colors":{"h":"logoGray","smc":"richBlack"}}},"front":{"black":{"background":"ink","textColor":"paperWhite","logo":{"x":6.47,"top":39.1,"width":18.92,"colors":{"h":"logoGray","smc":"paperWhite"}},"rules":[{"id":"vertical","x1":31.75,"y1":-1,"x2":31.75,"y2":51,"strokePt":0.2,"color":"paperWhite"},{"id":"divider1","x1":31.71,"y1":14.32,"x2":91,"y2":14.32,"strokePt":0.203,"color":"paperWhite"},{"id":"divider2","x1":31.71,"y1":28.05,"x2":91,"y2":28.05,"strokePt":0.203,"color":"paperWhite"}],"text":{"nameEn":{"x":36.49,"y":6.3,"font":"ExtraBold","size":9,"tracking":10},"nameKo":{"gapAfterEn":1.6,"font":"ExtraBold","size":9,"tracking":20},"title1":{"x":36.49,"y":9.96,"font":"Regular","size":6,"tracking":10},"title2":{"x":36.49,"y":12.5,"font":"Regular","size":6,"tracking":10},"email1":{"x":36.49,"y":18.74,"font":"Medium","size":6,"tracking":25},"email2":{"x":36.49,"y":21.34,"font":"Medium","size":6,"tracking":25},"mobile":{"x":36.49,"y":24.65,"font":"SemiBold","size":7,"tracking":25}},"fixed":[{"x":36.49,"y":32.99,"font":"Medium","size":5.5,"tracking":10,"text":"04781 서울시 성동구 연무장길 36, 연무장 7층"},{"x":36.49,"y":35.32,"font":"Medium","size":5.5,"tracking":10,"text":"+82 2 3445 3232"},{"x":36.49,"y":37.97,"font":"Medium","size":5,"tracking":25,"text":"Yeonmujang bldg 7F, 36 Yeonmujang-gil, Seongdong-gu,"},{"x":36.49,"y":40.08,"font":"Medium","size":5,"tracking":25,"text":"Seoul Korea 04781"},{"x":36.49,"y":44.31,"font":"Bold","size":5.5,"tracking":0,"text":"HSMC Co., Ltd. (주)에이치에스엠씨"},{"x":36.49,"y":46.68,"font":"Bold","size":5.5,"tracking":50,"text":"www.hsmc-global.com"}],"variants":{"twoLineTitle":{"note":"영문 직책 2가 있을 때 (원본: 주종원 부장). 이름 줄을 살짝 올리고, 구분선과 연락처를 내림","text":{"nameEn":{"y":5.94},"nameKo":{"y":5.94},"title1":{"y":9.61},"title2":{"y":12.15},"email1":{"y":19.45},"email2":{"y":22.05},"mobile":{"y":25.36}},"rules":{"divider1":{"y1":15.38,"y2":15.38}}}}},"white":{"background":null,"textColor":"ink","logo":{"x":8.27,"top":6.0,"width":19.18,"colors":{"h":"logoGray","smc":"ink"}},"rules":[{"id":"contactBar","x1":38.54,"y1":23.83,"x2":38.54,"y2":32.73,"strokePt":0.7,"color":"ink"}],"text":{"nameEn":{"x":38.54,"y":9.0,"font":"ExtraBold","size":9,"tracking":10},"nameKo":{"gapAfterEn":1.0,"font":"ExtraBold","size":9,"tracking":10},"title1":{"x":38.54,"y":12.73,"font":"Regular","size":6,"tracking":10},"title2":{"x":38.54,"y":15.27,"font":"Regular","size":6,"tracking":10},"email1":{"x":40.44,"y":25.68,"font":"Medium","size":6.5,"tracking":25},"email2":{"x":40.44,"y":28.86,"font":"Medium","size":6.5,"tracking":25},"mobile":{"x":40.44,"y":32.39,"font":"SemiBold","size":7,"tracking":20}},"fixed":[{"x":38.54,"y":37.83,"font":"Light","size":5.5,"tracking":10,"text":"04781 서울시 성동구 연무장길 36, 연무장 7층"},{"x":38.54,"y":40.15,"font":"Light","size":5.5,"tracking":10,"text":"+82 2 3445 3232"},{"x":38.54,"y":43.07,"font":"Light","size":5,"tracking":25,"text":"Yeonmujang bldg 7F, 36 Yeonmujang-gil, Seongdong-gu,"},{"x":38.54,"y":45.19,"font":"Light","size":5,"tracking":25,"text":"Seoul, Korea 04781"},{"x":8.2,"y":39.65,"font":"SemiBold","size":5,"tracking":10,"text":"HSMC Co., Ltd."},{"x":8.2,"y":41.96,"font":"SemiBold","size":5,"tracking":0,"text":"(주)에이치에스엠씨"},{"x":8.23,"y":45.22,"font":"SemiBold","size":5,"tracking":0,"text":"www.hsmc-global.com"}]}},"content":{"nameEn":"{영문 표기}","nameKo":"{국문 성}{국문 이름} {국문 직책}  — 국문 직책이 '사원'이면 생략","title1":"1본부·2본부: '{소속} | {영문 직책 1}' / 경영지원팀·임원: '{영문 직책 1}'","title2":"{영문 직책 2} — 없으면 줄 생략","email1":"{이메일 아이디 1}@hivesmc.com","email2":"{이메일 아이디 2}@oksmc.co.kr","mobile":"+82 10 XXXX XXXX"}};
+</script>
+<script>
+/* ===== 명함 PDF 생성기 (card-pdf.js) ===== */
+/*
+ * HSMC 명함 PDF 생성기
+ * card-layout.json(설계도) + 직원 정보 → 앞·뒷면 2페이지 CMYK PDF
+ * 브라우저(신청 화면)와 Node 양쪽에서 같은 코드로 동작합니다.
+ *
+ * buildCardPdf({ PDFLib, fontkit, layout, fontBytes, person }) → Uint8Array
+ *   person = { koLast, koFirst, koTitle, org, enName, enTitle1, enTitle2,
+ *              mobile, email1, email2, design: 'white' | 'black' }
+ */
+(function (root) {
+  const MM = 72 / 25.4;
+
+  function cardTexts(p) {
+    const koTitle = p.koTitle === '사원' ? '' : (p.koTitle || '');
+    const prefix = (p.org === '1본부' || p.org === '2본부') ? p.org : '';
+    const t1 = prefix && p.enTitle1 ? prefix + ' | ' + p.enTitle1 : (p.enTitle1 || prefix);
+    const m = String(p.mobile || '').replace(/\D/g, '');
+    const mobile = m.length === 11 ? '+82 ' + m.slice(1, 3) + ' ' + m.slice(3, 7) + ' ' + m.slice(7) : '';
+    return {
+      nameEn: p.enName || '',
+      nameKo: (p.koLast || '') + (p.koFirst || '') + (koTitle ? ' ' + koTitle : ''),
+      title1: t1,
+      title2: p.enTitle2 || '',
+      email1: p.email1 ? p.email1 + '@hivesmc.com' : '',
+      email2: p.email2 ? p.email2 + '@oksmc.co.kr' : '',
+      mobile: mobile
+    };
+  }
+
+  function pickVariant(layout, p) {
+    if (p.design === 'white') return { key: 'white', spec: layout.front.white };
+    const base = layout.front.black;
+    if (!p.enTitle2) return { key: 'black', spec: base };
+    const v = base.variants.twoLineTitle;
+    const text = {};
+    Object.keys(base.text).forEach((k) => { text[k] = Object.assign({}, base.text[k], v.text[k] || {}); });
+    const rules = base.rules.map((r) => Object.assign({}, r, (v.rules || {})[r.id] || {}));
+    return { key: 'black+twoLineTitle', spec: Object.assign({}, base, { text, rules }) };
+  }
+
+  async function buildCardPdf({ PDFLib, fontkit, layout, fontBytes, person }) {
+    const { PDFDocument, cmyk, pushGraphicsState, popGraphicsState, setCharacterSpacing } = PDFLib;
+    const pg = layout.page;
+    const markMargin = pg.cropMarks.enabled ? pg.cropMarks.offset + pg.cropMarks.length : pg.bleed;
+    const origin = markMargin; // 문서 왼쪽 위 → 재단선 왼쪽 위까지 거리(mm)
+    const W = (pg.trim.w + 2 * markMargin) * MM;
+    const H = (pg.trim.h + 2 * markMargin) * MM;
+
+    const col = (name) => { const c = layout.colors[name].cmyk; return cmyk(c[0] / 100, c[1] / 100, c[2] / 100, c[3] / 100); };
+    const X = (mm) => (origin + mm) * MM;
+    const Y = (mm) => H - (origin + mm) * MM;
+
+    const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    doc.setTitle('HSMC 명함');
+    const fonts = {};
+    for (const k of Object.keys(fontBytes)) fonts[k] = await doc.embedFont(fontBytes[k], { subset: true });
+
+    function newPage() {
+      const page = doc.addPage([W, H]);
+      const b = pg.bleed;
+      page.setBleedBox(X(-b), Y(pg.trim.h + b), (pg.trim.w + 2 * b) * MM, (pg.trim.h + 2 * b) * MM);
+      page.setTrimBox(X(0), Y(pg.trim.h), pg.trim.w * MM, pg.trim.h * MM);
+      return page;
+    }
+
+    function text(page, s, spec, color) {
+      if (!s) return;
+      const font = fonts[spec.font];
+      page.pushOperators(pushGraphicsState(), setCharacterSpacing((spec.tracking || 0) / 1000 * spec.size));
+      page.drawText(s, { x: X(spec.x), y: Y(spec.y), size: spec.size, font, color });
+      page.pushOperators(popGraphicsState());
+    }
+    function advance(s, spec) {
+      return fonts[spec.font].widthOfTextAtSize(s, spec.size) + (spec.tracking || 0) / 1000 * spec.size * [...s].length;
+    }
+    function logo(page, spec) {
+      const scale = (spec.width * MM) / layout.logo.width;
+      for (const part of ['h', 'smc']) {
+        page.drawSvgPath(layout.logo.parts[part], { x: X(spec.x), y: Y(spec.top), scale, color: col(spec.colors[part]), borderWidth: 0 });
+      }
+    }
+    function rule(page, r) {
+      const b = pg.bleed;
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      page.drawLine({
+        start: { x: X(clamp(r.x1, -b, pg.trim.w + b)), y: Y(clamp(r.y1, -b, pg.trim.h + b)) },
+        end: { x: X(clamp(r.x2, -b, pg.trim.w + b)), y: Y(clamp(r.y2, -b, pg.trim.h + b)) },
+        thickness: r.strokePt, color: col(r.color)
+      });
+    }
+    function cropMarks(page) {
+      const c = pg.cropMarks; if (!c.enabled) return;
+      const color = col(c.color); const t = c.strokePt;
+      const xs = [0, pg.trim.w], ys = [0, pg.trim.h];
+      for (const x of xs) for (const y of ys) {
+        const dx = x === 0 ? -1 : 1, dy = y === 0 ? -1 : 1;
+        page.drawLine({ start: { x: X(x + dx * c.offset), y: Y(y) }, end: { x: X(x + dx * (c.offset + c.length)), y: Y(y) }, thickness: t, color });
+        page.drawLine({ start: { x: X(x), y: Y(y + dy * c.offset) }, end: { x: X(x), y: Y(y + dy * (c.offset + c.length)) }, thickness: t, color });
+      }
+    }
+
+    // ── 앞면
+    const v = pickVariant(layout, person);
+    const spec = v.spec;
+    const t = cardTexts(person);
+    const front = newPage();
+    if (spec.background) {
+      const b = pg.bleed;
+      front.drawRectangle({ x: X(-b), y: Y(pg.trim.h + b), width: (pg.trim.w + 2 * b) * MM, height: (pg.trim.h + 2 * b) * MM, color: col(spec.background), borderWidth: 0 });
+    }
+    spec.rules.forEach((r) => rule(front, r));
+    logo(front, spec.logo);
+    const tc = col(spec.textColor);
+    text(front, t.nameEn, spec.text.nameEn, tc);
+    const koSpec = Object.assign({}, spec.text.nameKo, {
+      x: spec.text.nameEn.x + advance(t.nameEn, spec.text.nameEn) / MM + spec.text.nameKo.gapAfterEn,
+      y: spec.text.nameKo.y != null ? spec.text.nameKo.y : spec.text.nameEn.y
+    });
+    text(front, t.nameKo, koSpec, tc);
+    ['title1', 'title2', 'email1', 'email2', 'mobile'].forEach((k) => text(front, t[k], spec.text[k], tc));
+    spec.fixed.forEach((f) => text(front, f.text, f, tc));
+    cropMarks(front);
+
+    // ── 뒷면
+    const back = newPage();
+    logo(back, layout.back.logo);
+    cropMarks(back);
+
+    return { bytes: await doc.save(), variant: v.key };
+  }
+
+  const api = { buildCardPdf, cardTexts, pickVariant };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.HSMCCard = api;
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+/* ===== 신청 화면 ===== */
+(function () {
+  var CFG = window.__HSMC_TEST || {};
+  var FONT_BASE = CFG.fontBase || 'https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/public/static/alternative/';
+  var FONTKIT_URLS = CFG.fontkitUrls || ['https://cdn.jsdelivr.net/npm/fontkit@2.0.4/+esm', 'https://esm.sh/fontkit@2.0.4'];
+
+  var ORGS = [
+    { value: '1본부', label: '1본부' },
+    { value: '2본부-기획팀', label: '2본부 기획팀' },
+    { value: '2본부-크리에이티브팀', label: '2본부 크리에이티브팀' },
+    { value: '경영지원팀', label: '경영지원팀' },
+    { value: '임원', label: '대표·이사예요' }
+  ];
+  var REASONS = [
+    { value: 'new_hire', label: '신규 입사자예요' },
+    { value: 'reorder', label: '명함이 소진됐어요' },
+    { value: 'role_change', label: '직책/소속 본부가 변경되었어요' },
+    { value: 'info_change', label: '정보가 변경되었어요' }
+  ];
+  var CHECK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3182F6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>';
+  var CHEVRON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4E5968" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>';
+
+  var DATA = { employees: [], enTitles: {}, loaded: false, loadError: '' };
+  var AUTH = null;                 // 로그인 성공한 아이디·비밀번호 (이 탭에서만 기억)
+  var LOGIN = { id: '', pw: '', busy: false };
+  var S = Object.assign({ screen: 'intro' }, blank());
+  var panel = document.getElementById('panel');
+  var introTimer = null;
+
+  function blank() {
+    return { reason: '', query: '', emp: null, empLoading: false, orgKey: '',
+      ko_last: '', ko_first: '', title_ko: '', en_last: '', en_first: '', title_en: '',
+      mobile: '', email1: '', email2: '', email2Touched: false,
+      face: 'front', sheet: false, submitting: false, error: '' };
+  }
+
+  // ── 유틸
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function call(fn) {
+    var args = [].slice.call(arguments, 1);
+    return new Promise(function (res, rej) {
+      var r = google.script.run.withSuccessHandler(res).withFailureHandler(rej);
+      r[fn].apply(r, [AUTH].concat(args));
+    });
+  }
+  function convLast(s) { return (s || '').replace(/[\s\-]/g, '').toUpperCase(); }
+  function convFirst(s) { var t = (s || '').replace(/[\s\-]/g, ''); return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : ''; }
+  function fmtMobile(m) {
+    if (!m || m.charAt(0) !== '0') return '';
+    var r = m.slice(1);
+    return ('+82 ' + [r.slice(0, 2), r.slice(2, 6), r.slice(6)].filter(Boolean).join(' ')).trim();
+  }
+  function cleanId(v) { return (v || '').split('@')[0].replace(/[^a-zA-Z0-9._+\-]/g, ''); }
+  function orgKeyOf(org, team) { return team ? org + '-' + team : org; }
+  function splitOrg(key) { var i = key.indexOf('-'); return i < 0 ? { org: key, team: '' } : { org: key.slice(0, i), team: key.slice(i + 1) }; }
+  function orgLabelOf(key) { var o = ORGS.filter(function (x) { return x.value === key; })[0]; return key === '임원' ? '임원' : (o ? o.label : key.replace('-', ' ')); }
+  function titleOptionsFor(key) {
+    if (key === '경영지원팀') return ['차장'];
+    if (key === '임원') return ['대표', '이사'];
+    if (key) return ['사원', '대리', '과장', '차장', '부장'];
+    return [];
+  }
+
+  // ── 흐름
+  function flow() {
+    var creative = S.orgKey === '2본부-크리에이티브팀';
+    if (S.reason === 'new_hire') return ['intro', 'reason', 'org', 'info-ko', 'info-en', 'contact', 'confirm', 'done'];
+    if (S.reason === 'reorder') return ['intro', 'reason', 'find-me', 'confirm', 'done'];
+    if (S.reason === 'role_change') return ['intro', 'reason', 'find-me', 'org', 'info-ko'].concat(creative ? ['info-en'] : [], ['confirm', 'done']);
+    if (S.reason === 'info_change') return ['intro', 'reason', 'find-me', 'contact', 'confirm', 'done'];
+    return ['intro', 'reason'];
+  }
+  function go(screen) {
+    clearTimeout(introTimer);
+    S.screen = screen; S.error = ''; S.sheet = false;
+    if (screen === 'intro') startIntro();
+    if (screen === 'confirm') { ensureOrgKey(); loadAssets().catch(function () {}); }
+    render();
+    panel.querySelector('.main') && (panel.querySelector('.main').scrollTop = 0);
+  }
+  function step(dir) { var f = flow(); var t = f[f.indexOf(S.screen) + dir]; if (t) go(t); }
+  function startIntro() { clearTimeout(introTimer); introTimer = setTimeout(function () { if (S.screen === 'intro') go(firstScreen()); }, 3200); }
+  function firstScreen() { return AUTH ? 'reason' : 'login'; }
+
+  // ── 명함 내용 계산
+  function lockNames() { return S.reason === 'role_change'; }
+  function showTitleEn() { return S.orgKey === '2본부-크리에이티브팀' || S.orgKey === '임원'; }
+  function enTitle1() {
+    if ((S.reason === 'reorder' || S.reason === 'info_change') && S.emp) return S.emp.enTitle1;
+    if (showTitleEn()) return (S.title_en || '').trim();
+    var t = (DATA.enTitles[S.orgKey] || {})[S.title_ko];
+    if (t) return t;
+    if (S.emp && S.emp.title === S.title_ko) return S.emp.enTitle1;
+    return '';
+  }
+  function enTitle2() {
+    if (!S.emp || S.reason === 'new_hire') return '';
+    if (S.reason === 'role_change' && splitOrg(S.orgKey).org !== S.emp.org) return '';
+    return S.emp.enTitle2 || '';
+  }
+  function enName() {
+    if (S.emp && S.reason !== 'new_hire') return S.emp.enName;
+    return [convFirst(S.en_first), convLast(S.en_last)].filter(Boolean).join(' ');
+  }
+  function design() { return S.emp ? S.emp.design : (S.title_ko === '대표' ? 'white' : 'black'); }
+  function person() {
+    var o = splitOrg(S.orgKey);
+    return { koLast: S.ko_last.trim(), koFirst: S.ko_first.trim(), koTitle: S.title_ko, org: o.org, team: o.team,
+      enName: enName(), enTitle1: enTitle1(), enTitle2: enTitle2(),
+      mobile: S.mobile, email1: S.email1, email2: S.email2, design: design() };
+  }
+  function canNext() {
+    var sc = S.screen;
+    if (sc === 'login') return !!(LOGIN.id.trim() && LOGIN.pw) && !LOGIN.busy;
+    if (sc === 'find-me') return !!S.emp && !S.empLoading;
+    if (sc === 'org') return !!S.orgKey;
+    if (sc === 'info-ko') return !!(S.ko_last.trim() && S.ko_first.trim() && S.title_ko);
+    if (sc === 'info-en') return (lockNames() || !!(convLast(S.en_last) && convFirst(S.en_first))) && (!showTitleEn() || !!S.title_en.trim());
+    if (sc === 'contact') return S.mobile.length === 11 && S.mobile.indexOf('010') === 0 && !!S.email1 && !!S.email2;
+    return true;
+  }
+
+  // ── 화면 그리기
+  function render() {
+    var h = '';
+    if (S.screen === 'intro') {
+      h = '<div class="intro">' +
+        '<div style="font-size:20px;font-weight:700;letter-spacing:.12em;color:#3182F6;animation:rise .7s ease both">HSMC</div>' +
+        '<div style="font-size:44px;line-height:1.2;font-weight:700;animation:rise .7s .25s ease both">명함<br>만들기</div>' +
+        '<div style="position:absolute;left:32px;right:32px;bottom:48px;height:4px;border-radius:2px;background:#E5E8EB;overflow:hidden"><div style="height:100%;background:#3182F6;border-radius:2px;animation:fill 3.2s linear forwards"></div></div>' +
+        '<button aria-label="바로 시작하기" data-act="skip" style="position:absolute;inset:0;border:0;background:transparent"></button></div>';
+      panel.innerHTML = h; return;
+    }
+    h += '<div class="main">';
+    if (S.error) h += '<div class="alert" role="alert">' + esc(S.error) + '</div>';
+    if (DATA.loadError) h += '<div class="alert" role="alert">' + esc(DATA.loadError) + '</div>';
+    h += screenHTML();
+    h += '</div>' + footerHTML();
+    if (S.sheet) h += sheetHTML();
+    panel.innerHTML = h;
+    refresh();
+    if (S.screen === 'confirm') onCardLeave();
+  }
+
+  function screenHTML() {
+    var sc = S.screen, h = '';
+    if (sc === 'login') {
+      return '<h1>HSMC 직원만 이용할 수 있어요</h1><div class="stack20">' +
+        '<div><label class="lbl" for="login_id">아이디</label><div class="field"><input id="login_id" data-f="login_id" type="text" autocomplete="username" autocapitalize="characters" value="' + esc(LOGIN.id) + '"></div></div>' +
+        '<div><label class="lbl" for="login_pw">비밀번호</label><div class="field"><input id="login_pw" data-f="login_pw" type="password" inputmode="numeric" autocomplete="current-password" value="' + esc(LOGIN.pw) + '"></div></div></div>';
+    }
+    if (sc === 'reason') {
+      h += '<h1>어떤 이유로 명함이 필요하세요?</h1><div class="stack">';
+      REASONS.forEach(function (r) { h += '<button class="choice' + (S.reason === r.value ? ' sel' : '') + '" data-act="reason" data-v="' + r.value + '"><span>' + r.label + '</span></button>'; });
+      return h + '</div>';
+    }
+    if (sc === 'find-me') {
+      return '<h1>이름을 알려주세요</h1><div><label class="lbl" for="search_name">이름</label>' +
+        '<div class="field"><input id="search_name" data-f="query" type="text" placeholder="홍길동" autocomplete="off" value="' + esc(S.query) + '"></div></div>' +
+        '<div id="cands" class="stack">' + candsHTML() + '</div>';
+    }
+    if (sc === 'org') {
+      h += '<h1>소속을 알려주세요</h1><div class="stack">';
+      ORGS.forEach(function (o) {
+        if (S.reason === 'new_hire' && o.value === '임원') return;
+        h += '<button class="choice' + (S.orgKey === o.value ? ' sel' : '') + '" data-act="org" data-v="' + o.value + '"><span>' + o.label + '</span></button>';
+      });
+      return h + '</div>';
+    }
+    if (sc === 'info-ko') {
+      var fc = lockNames() ? 'field locked' : 'field', dis = lockNames() ? ' disabled' : '';
+      return '<h1>국문 정보를 입력해 주세요</h1><div style="display:flex;gap:12px">' +
+        '<div style="flex:0 0 120px"><label class="lbl" for="ko_last">성</label><div class="' + fc + '"><input id="ko_last" data-f="ko_last" type="text" value="' + esc(S.ko_last) + '"' + dis + '></div></div>' +
+        '<div style="flex:1;min-width:0"><label class="lbl" for="ko_first">이름</label><div class="' + fc + '"><input id="ko_first" data-f="ko_first" type="text" value="' + esc(S.ko_first) + '"' + dis + '></div></div></div>' +
+        '<div><span class="lbl">직책</span><button class="field" aria-haspopup="dialog" data-act="openSheet"><span style="color:' + (S.title_ko ? '#191F28' : '#6B7684') + '">' + esc(S.title_ko || '직책을 선택해 주세요') + '</span>' + CHEVRON + '</button></div>';
+    }
+    if (sc === 'info-en') {
+      var fc2 = lockNames() ? 'field locked' : 'field', dis2 = lockNames() ? ' disabled' : '';
+      h += '<h1>영문 정보를 입력해 주세요</h1><div class="stack20">' +
+        '<div><label class="lbl" for="en_last">성</label><div class="' + fc2 + '"><input id="en_last" data-f="en_last" type="text" value="' + esc(S.en_last) + '"' + dis2 + '></div></div>' +
+        '<div><label class="lbl" for="en_first">이름</label><div class="' + fc2 + '"><input id="en_first" data-f="en_first" type="text" value="' + esc(S.en_first) + '"' + dis2 + '></div></div>' +
+        '<div id="enPreview" class="sub"></div>';
+      if (showTitleEn()) h += '<div><label class="lbl" for="title_en">영문 직책</label><div class="field"><input id="title_en" data-f="title_en" type="text" value="' + esc(S.title_en) + '"></div></div>';
+      return h + '</div>';
+    }
+    if (sc === 'contact') {
+      return '<h1>연락처를 입력해 주세요</h1><div class="stack20">' +
+        '<div><label class="lbl" for="mobile" style="margin-bottom:4px">휴대폰</label><div class="hint" style="margin-bottom:8px">숫자만 입력해 주세요</div>' +
+        '<div class="field"><input id="mobile" data-f="mobile" type="tel" inputmode="numeric" placeholder="01012341234" value="' + esc(S.mobile) + '"></div>' +
+        '<div id="mobilePreview" class="preview" style="margin-top:8px"></div><div id="mobileErr" class="err" style="margin-top:8px"></div></div>' +
+        '<div><label class="lbl" for="email1">이메일 1</label><div class="field"><input id="email1" data-f="email1" type="text" value="' + esc(S.email1) + '"><span class="suffix">@hivesmc.com</span></div></div>' +
+        '<div><label class="lbl" for="email2">이메일 2</label><div class="field"><input id="email2" data-f="email2" type="text" value="' + esc(S.email2) + '"><span class="suffix">@oksmc.co.kr</span></div></div></div>';
+    }
+    if (sc === 'confirm') {
+      var front = S.face === 'front';
+      return '<h1>마지막으로 명함 정보를 확인해 주세요</h1><div class="stack">' +
+        '<div style="display:flex;gap:4px;padding:4px;border-radius:14px;background:#F2F4F6">' +
+        '<button class="seg' + (front ? ' sel' : '') + '" data-act="face" data-v="front">앞면</button>' +
+        '<button class="seg' + (front ? '' : ' sel') + '" data-act="face" data-v="back">뒷면</button></div>' +
+        '<div class="cardbox" id="cardbox"><div class="card" id="card" style="transform:scale(' + (352 / 450) + ')">' + cardHTML() + '</div></div>' +
+        '<div class="hint">명함에 마우스를 올리면 크게 볼 수 있어요</div></div>';
+    }
+    if (sc === 'done') {
+      return '<div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding-top:120px">' +
+        '<svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true"><circle cx="28" cy="28" r="28" fill="#3182F6"></circle><path d="M17 29l7.5 7.5L39.5 21" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path></svg>' +
+        '<h1 style="margin-top:12px">명함 신청이 완료됐어요!</h1>' +
+        '<div style="font-size:17px;line-height:1.6;color:#4E5968">' + esc(S.ko_last + S.ko_first) + '님의 명함은 평일 기준 3~4일 정도 걸려요.</div></div>';
+    }
+    return '';
+  }
+
+  function candsHTML() {
+    var q = S.query.trim();
+    if (!DATA.loaded) return q.length >= 2 ? '<div class="hint">직원 목록을 불러오는 중이에요</div>' : '';
+    if (q.length < 2) return '';
+    var list = DATA.employees.filter(function (e) { return (e.koLast + e.koFirst).indexOf(q) >= 0; });
+    if (!list.length) return '<div style="display:flex;flex-direction:column;gap:8px;padding:8px 0"><div style="font-size:17px;font-weight:500">찾는 이름이 없어요</div>' +
+      '<button class="linkbtn" data-act="toNewHire">처음 명함을 만드시나요? 신규로 신청할게요</button></div>';
+    return list.map(function (e) {
+      var sel = S.emp && S.emp.id === e.id;
+      var loading = sel && S.empLoading;
+      return '<button class="choice' + (sel ? ' sel' : '') + '" data-act="pick" data-v="' + e.id + '" style="min-height:68px">' +
+        '<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:700">' + esc(e.koLast + e.koFirst) + '</span>' +
+        '<span class="sub">' + esc(orgLabelOf(orgKeyOf(e.org, e.team)) + ' · ' + e.title) + (loading ? ' · 불러오는 중' : '') + '</span></span>' +
+        (sel && !loading ? CHECK : '') + '</button>';
+    }).join('');
+  }
+
+  function footerHTML() {
+    var sc = S.screen;
+    if (sc === 'login') return '<div class="foot"><div><button class="btn btn-primary' + (LOGIN.busy ? ' is-loading' : '') + '" id="next" data-act="login"' + (LOGIN.busy ? ' disabled' : '') + '>' +
+      (LOGIN.busy ? '<span class="spin" aria-hidden="true"></span>' : '') + '<span>확인</span></button></div></div>';
+    if (sc === 'reason') return '<div class="foot"><div><button class="btn btn-primary" id="next" data-act="next"' + (S.reason ? '' : ' disabled') + '>다음</button></div></div>';
+    if (sc === 'done') return '<div class="foot"><div><button class="btn btn-primary" data-act="restart">처음으로 돌아가기</button></div></div>';
+    if (sc === 'confirm') {
+      return '<div class="foot"><div><button class="btn btn-secondary" data-act="edit"' + (S.submitting ? ' disabled' : '') + '>명함 정보를 수정할게요</button></div>' +
+        '<div><button class="btn btn-primary' + (S.submitting ? ' is-loading' : '') + '" data-act="submit"' + (S.submitting ? ' disabled' : '') + '>' +
+        (S.submitting ? '<span class="spin" aria-hidden="true"></span>' : '') + '<span>이대로 신청할게요</span></button></div></div>';
+    }
+    return '<div class="foot"><div><button class="btn btn-secondary" data-act="prev">이전</button></div>' +
+      '<div><button class="btn btn-primary" id="next" data-act="next">다음</button></div></div>';
+  }
+
+  function sheetHTML() {
+    var opts = titleOptionsFor(S.orgKey).slice();
+    if (S.title_ko && opts.indexOf(S.title_ko) < 0) opts.unshift(S.title_ko);
+    return '<div class="sheet"><button class="scrim" aria-label="닫기" data-act="closeSheet"></button>' +
+      '<div class="body" role="dialog" aria-label="직책 선택"><div style="margin-bottom:6px;font-size:18px;font-weight:700">직책을 선택해 주세요</div>' +
+      opts.map(function (t) { var sel = t === S.title_ko; return '<button class="choice' + (sel ? ' sel' : '') + '" data-act="title" data-v="' + esc(t) + '" style="min-height:56px"><span>' + esc(t) + '</span>' + (sel ? CHECK : '') + '</button>'; }).join('') +
+      '</div></div>';
+  }
+
+  // 입력할 때마다 바뀌는 부분만 갱신 (입력칸 포커스 유지)
+  function refresh() {
+    var next = document.getElementById('next');
+    if (next && S.screen !== 'reason') next.disabled = !canNext();
+    var ep = document.getElementById('enPreview');
+    if (ep) {
+      var f = convFirst(S.en_first), l = convLast(S.en_last);
+      ep.innerHTML = (f && l) ? '명함에는 <strong style="color:#1B64DA">' + esc(f + ' ' + l) + '</strong>으로 들어가요' : '';
+    }
+    var mp = document.getElementById('mobilePreview');
+    if (mp) mp.textContent = fmtMobile(S.mobile);
+    var me = document.getElementById('mobileErr');
+    if (me) me.textContent = (S.mobile.length >= 3 && S.mobile.indexOf('010') !== 0) ? '010으로 시작하는 11자리 번호를 입력해 주세요' : '';
+  }
+
+  // ── 명함 미리보기 (card-layout.json 수치를 그대로 사용, 1mm = 5px)
+  function cardHTML() {
+    var PX = 5, PT = 25.4 / 72 * PX, ASC = 0.855;
+    var W8 = { Light: 300, Regular: 400, Medium: 500, SemiBold: 600, Bold: 700, ExtraBold: 800 };
+    var hexOf = { ink: '#121B21', paperWhite: '#FFFFFF', logoGray: '#B8B8BC', richBlack: '#000000' };
+    var p = person();
+    var t = HSMCCard.cardTexts(p);
+    var h = '';
+    function path(spec) {
+      var w = spec.width * PX, ht = w * LAYOUT.logo.height / LAYOUT.logo.width;
+      return '<svg viewBox="0 0 ' + LAYOUT.logo.width + ' ' + LAYOUT.logo.height + '" aria-hidden="true" style="position:absolute;left:' + (spec.x * PX) + 'px;top:' + (spec.top * PX) + 'px;width:' + w + 'px;height:' + ht + 'px">' +
+        '<path fill="' + hexOf[spec.colors.h] + '" d="' + LAYOUT.logo.parts.h + '"></path><path fill="' + hexOf[spec.colors.smc] + '" d="' + LAYOUT.logo.parts.smc + '"></path></svg>';
+    }
+    function txt(s, spec, color) {
+      if (!s) return '';
+      return '<div class="t" style="left:' + (spec.x * PX).toFixed(2) + 'px;top:' + (spec.y * PX - spec.size * PT * ASC).toFixed(2) + 'px;font-size:' + (spec.size * PT).toFixed(2) +
+        'px;font-weight:' + W8[spec.font] + ';letter-spacing:' + ((spec.tracking || 0) / 1000) + 'em;color:' + color + '">' + esc(s) + '</div>';
+    }
+    if (S.face === 'back') {
+      return '<div style="position:absolute;inset:0;background:#fff"></div>' + path(LAYOUT.back.logo);
+    }
+    var v = HSMCCard.pickVariant(LAYOUT, p).spec;
+    var color = hexOf[v.textColor];
+    h += '<div style="position:absolute;inset:0;background:' + (v.background ? hexOf[v.background] : '#fff') + '"></div>';
+    v.rules.forEach(function (r) {
+      var c = hexOf[r.color], w = Math.max(r.strokePt * PT * 1.2, 0.6);
+      if (r.x1 === r.x2) h += '<div style="position:absolute;left:' + (r.x1 * PX - w / 2) + 'px;top:' + (Math.max(r.y1, 0) * PX) + 'px;width:' + w + 'px;height:' + ((Math.min(r.y2, 50) - Math.max(r.y1, 0)) * PX) + 'px;background:' + c + '"></div>';
+      else h += '<div style="position:absolute;left:' + (r.x1 * PX) + 'px;top:' + (r.y1 * PX - w / 2) + 'px;width:' + ((Math.min(r.x2, 90) - r.x1) * PX) + 'px;height:' + w + 'px;background:' + c + '"></div>';
+    });
+    h += path(v.logo);
+    var ne = v.text.nameEn, nk = v.text.nameKo;
+    h += '<div class="t" style="left:' + (ne.x * PX) + 'px;top:' + ((nk.y != null ? nk.y : ne.y) * PX - 9 * PT * ASC).toFixed(2) + 'px;display:flex;gap:' + (nk.gapAfterEn * PX) + 'px;font-size:' + (9 * PT).toFixed(2) + 'px;font-weight:800;color:' + color + '">' +
+      '<span style="letter-spacing:' + (ne.tracking / 1000) + 'em">' + esc(t.nameEn) + '</span><span style="letter-spacing:' + (nk.tracking / 1000) + 'em">' + esc(t.nameKo) + '</span></div>';
+    ['title1', 'title2', 'email1', 'email2', 'mobile'].forEach(function (k) { h += txt(t[k], v.text[k], color); });
+    v.fixed.forEach(function (f) { h += txt(f.text, f, color); });
+    return h;
+  }
+
+  function onCardMove(e) {
+    var box = document.getElementById('cardbox'), card = document.getElementById('card');
+    if (!box || !card) return;
+    var r = box.getBoundingClientRect(), W = box.offsetWidth, H = box.offsetHeight;
+    var s0 = W / 450, s1 = 2;
+    var cx = (e.clientX - r.left) * (W / r.width), cy = (e.clientY - r.top) * (H / r.height);
+    var tx = Math.max(W - s1 * 450, Math.min(0, cx - s1 * cx / s0));
+    var ty = Math.max(H - s1 * 250, Math.min(0, cy - s1 * cy / s0));
+    card.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + s1 + ')';
+  }
+  function onCardLeave() {
+    var box = document.getElementById('cardbox'), card = document.getElementById('card');
+    if (box && card) card.style.transform = 'scale(' + (box.offsetWidth / 450) + ')';
+  }
+
+  // ── 이벤트
+  panel.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    var act = b.getAttribute('data-act'), v = b.getAttribute('data-v');
+    if (act === 'skip') go(firstScreen());
+    else if (act === 'login') doLogin();
+    else if (act === 'reason') { if (v !== S.reason) { S = Object.assign(blank(), { screen: 'reason', reason: v }); } render(); }
+    else if (act === 'next') step(1);
+    else if (act === 'prev') step(-1);
+    else if (act === 'org') {
+      var opts = titleOptionsFor(v);
+      var keep = S.title_ko && (opts.indexOf(S.title_ko) >= 0 || (S.emp && S.emp.title === S.title_ko));
+      S.orgKey = v; if (!keep) S.title_ko = '';
+      render();
+    }
+    else if (act === 'openSheet') { S.sheet = true; render(); }
+    else if (act === 'closeSheet') { S.sheet = false; render(); }
+    else if (act === 'title') { S.title_ko = v; S.sheet = false; render(); }
+    else if (act === 'pick') pickEmployee(Number(v));
+    else if (act === 'toNewHire') { S = Object.assign(blank(), { screen: 'org', reason: 'new_hire' }); render(); }
+    else if (act === 'face') { S.face = v; render(); }
+    else if (act === 'edit') {
+      if (S.reason === 'reorder') { S.reason = 'info_change'; go('contact'); }
+      else if (S.reason === 'info_change') go('contact');
+      else go('org');
+    }
+    else if (act === 'submit') submit();
+    else if (act === 'restart') { S = Object.assign(blank(), { screen: 'intro' }); go('intro'); }
+  });
+
+  panel.addEventListener('input', function (e) {
+    var f = e.target.getAttribute('data-f');
+    if (!f) return;
+    var v = e.target.value;
+    if (f === 'login_id' || f === 'login_pw') { LOGIN[f === 'login_id' ? 'id' : 'pw'] = v; refresh(); return; }
+    if (f === 'mobile') { v = v.replace(/\D/g, '').slice(0, 11); e.target.value = v; }
+    if (f === 'email1' || f === 'email2') { v = cleanId(v); e.target.value = v; }
+    S[f] = v;
+    if (f === 'email1' && !S.email2Touched) { S.email2 = v; var e2 = document.getElementById('email2'); if (e2) e2.value = v; }
+    if (f === 'email2') S.email2Touched = true;
+    if (f === 'query') { S.emp = null; document.getElementById('cands').innerHTML = candsHTML(); }
+    refresh();
+  });
+
+  panel.addEventListener('mousemove', function (e) { if (e.target.closest('#cardbox')) onCardMove(e); });
+  panel.addEventListener('mouseout', function (e) { if (e.target.closest && e.target.closest('#cardbox') && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#cardbox'))) onCardLeave(); });
+
+  function pickEmployee(id) {
+    var base = DATA.employees.filter(function (x) { return x.id === id; })[0];
+    if (!base) return;
+    S.emp = Object.assign({}, base); S.empLoading = true;
+    document.getElementById('cands').innerHTML = candsHTML(); refresh();
+    call('getEmployee', id).then(function (e) {
+      if (!S.emp || S.emp.id !== id) return;
+      S.emp = e; S.empLoading = false;
+      S.orgKey = (e.org === '2본부' && !e.team) ? '' : orgKeyOf(e.org, e.team);
+      S.ko_last = e.koLast; S.ko_first = e.koFirst; S.title_ko = e.title;
+      var parts = String(e.enName || '').split(' ');
+      S.en_last = parts.length > 1 ? parts[parts.length - 1] : ''; S.en_first = parts.slice(0, -1).join(' ');
+      S.title_en = e.enTitle1 || '';
+      S.mobile = e.mobile; S.email1 = e.email1; S.email2 = e.email2; S.email2Touched = e.email1 !== e.email2;
+      if (S.screen === 'find-me') { document.getElementById('cands').innerHTML = candsHTML(); refresh(); }
+    }).catch(function (err) {
+      S.emp = null; S.empLoading = false;
+      S.error = '직원 정보를 불러오지 못했어요. 다시 선택해 주세요.';
+      render();
+    });
+  }
+  // 2본부 직원은 시트에 팀이 비어 있으면 소속을 화면에서 다시 고르게 됨.
+  // 단, 명함 소진·정보 변경은 소속 화면을 거치지 않으므로 기존 소속(2본부) 그대로 사용
+  function ensureOrgKey() { if (!S.orgKey && S.emp) S.orgKey = orgKeyOf(S.emp.org, S.emp.team); }
+
+  // ── PDF 재료 (글꼴·라이브러리) 미리 받아두기
+  var assetsPromise = null;
+  function importFontkit(i) {
+    i = i || 0;
+    if (i >= FONTKIT_URLS.length) return Promise.reject(new Error('fontkit'));
+    return import(FONTKIT_URLS[i]).catch(function () { return importFontkit(i + 1); });
+  }
+  function loadAssets() {
+    if (!assetsPromise) {
+      var files = LAYOUT.fonts.files, keys = Object.keys(files), fontBytes = {};
+      assetsPromise = Promise.all([importFontkit()].concat(keys.map(function (k) {
+        return fetch(FONT_BASE + files[k]).then(function (r) { if (!r.ok) throw new Error('font ' + k); return r.arrayBuffer(); })
+          .then(function (b) { fontBytes[k] = new Uint8Array(b); });
+      }))).then(function (res) { var m = res[0]; return { fontkit: m.default || m, fontBytes: fontBytes }; });
+      assetsPromise.catch(function () { assetsPromise = null; });
+    }
+    return assetsPromise;
+  }
+  function toBase64(bytes) {
+    var s = '', CH = 0x8000;
+    for (var i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(s);
+  }
+
+  function submit() {
+    if (S.submitting) return;
+    ensureOrgKey();
+    S.submitting = true; S.error = ''; render();
+    var p = person();
+    loadAssets().then(function (a) {
+      if (!window.PDFLib) throw new Error('pdf-lib');
+      return HSMCCard.buildCardPdf({ PDFLib: window.PDFLib, fontkit: a.fontkit, layout: LAYOUT, fontBytes: a.fontBytes, person: p });
+    }).then(function (r) {
+      var payload = Object.assign({}, p, { reason: S.reason, employeeId: S.emp ? S.emp.id : null, prevTitle: S.emp ? S.emp.title : '' });
+      return call('submitRequest', payload, toBase64(r.bytes));
+    }).then(function () {
+      S.submitting = false; go('done');
+    }).catch(function (err) {
+      S.submitting = false;
+      var msg = err && err.message ? String(err.message) : '';
+      S.error = '신청을 완료하지 못했어요. 입력한 내용은 그대로 있으니 다시 눌러 주세요.' + (msg && msg.length < 80 ? ' (' + msg + ')' : '');
+      render();
+    });
+  }
+
+  // ── 로그인 (서버에서 아이디·비밀번호 확인 후 직원 목록을 받아 옴)
+  function applyInit(d) { DATA.employees = d.employees; DATA.enTitles = d.enTitles; DATA.loaded = true; DATA.loadError = ''; }
+  function doLogin() {
+    if (LOGIN.busy || !canNext()) return;
+    var cred = { id: LOGIN.id.trim(), pw: LOGIN.pw };
+    LOGIN.busy = true; S.error = ''; render();
+    google.script.run.withSuccessHandler(function (d) {
+      AUTH = cred; LOGIN.busy = false; applyInit(d);
+      try { sessionStorage.setItem('hsmc_auth', JSON.stringify(cred)); } catch (e) {}
+      go('reason');
+    }).withFailureHandler(function (err) {
+      LOGIN.busy = false; LOGIN.pw = '';
+      S.error = (err && err.message && err.message.indexOf('아이디') >= 0) ? '아이디 또는 비밀번호가 맞지 않아요.' : '연결이 원활하지 않아요. 잠시 후 다시 시도해 주세요.';
+      render();
+      var pw = document.getElementById('login_pw'); if (pw) pw.focus();
+    }).login(cred);
+  }
+  panel.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && S.screen === 'login' && e.target.closest && e.target.closest('input')) { e.preventDefault(); doLogin(); }
+  });
+
+  // ── 시작: 같은 탭에서 이미 로그인했으면 조용히 다시 확인
+  (function () {
+    var saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem('hsmc_auth') || 'null'); } catch (e) {}
+    if (!saved) return;
+    google.script.run.withSuccessHandler(function (d) {
+      AUTH = saved; applyInit(d);
+      if (S.screen === 'login') go('reason');
+    }).withFailureHandler(function () {
+      try { sessionStorage.removeItem('hsmc_auth'); } catch (e) {}
+    }).login(saved);
+  })();
+  render();
+  startIntro();
+  setTimeout(function () { loadAssets().catch(function () {}); }, 4000);
+})();
+</script>
+</body>
+</html>
