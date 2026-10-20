@@ -117,7 +117,7 @@ var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source"
   }
 
   async function buildCardPdf({ PDFLib, fontkit, layout, fontBytes, person }) {
-    const { PDFDocument, cmyk, pushGraphicsState, popGraphicsState, setCharacterSpacing } = PDFLib;
+    const { PDFDocument, cmyk } = PDFLib;
     const pg = layout.page;
     const markMargin = pg.cropMarks.enabled ? pg.cropMarks.offset + pg.cropMarks.length : pg.bleed;
     const origin = markMargin; // 문서 왼쪽 위 → 재단선 왼쪽 위까지 거리(mm)
@@ -129,10 +129,21 @@ var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source"
     const Y = (mm) => H - (origin + mm) * MM;
 
     const doc = await PDFDocument.create();
-    doc.registerFontkit(fontkit);
     doc.setTitle('HSMC 명함');
+    // 글꼴은 PDF에 넣지 않고, 글자 모양을 도형(윤곽선)으로 그린다 → 인쇄소 글꼴 오류 없음
     const fonts = {};
-    for (const k of Object.keys(fontBytes)) fonts[k] = await doc.embedFont(fontBytes[k], { subset: true });
+    for (const k of Object.keys(fontBytes)) fonts[k] = fontkit.create(fontBytes[k] instanceof Uint8Array ? fontBytes[k] : new Uint8Array(fontBytes[k]));
+    function outline(s, spec) {
+      const f = fonts[spec.font], upm = f.unitsPerEm;
+      const track = (spec.tracking || 0) / 1000 * upm;
+      let pen = 0, d = '';
+      for (const g of f.layout(s).glyphs) {
+        const sv = g.path.scale(1, -1).translate(pen, 0).toSVG();
+        if (sv) d += sv + ' ';
+        pen += g.advanceWidth + track;
+      }
+      return { d: d.trim(), width: pen * spec.size / upm, scale: spec.size / upm };
+    }
 
     function newPage() {
       const page = doc.addPage([W, H]);
@@ -144,14 +155,10 @@ var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source"
 
     function text(page, s, spec, color) {
       if (!s) return;
-      const font = fonts[spec.font];
-      page.pushOperators(pushGraphicsState(), setCharacterSpacing((spec.tracking || 0) / 1000 * spec.size));
-      page.drawText(s, { x: X(spec.x), y: Y(spec.y), size: spec.size, font, color });
-      page.pushOperators(popGraphicsState());
+      const o = outline(s, spec);
+      if (o.d) page.drawSvgPath(o.d, { x: X(spec.x), y: Y(spec.y), scale: o.scale, color, borderWidth: 0 });
     }
-    function advance(s, spec) {
-      return fonts[spec.font].widthOfTextAtSize(s, spec.size) + (spec.tracking || 0) / 1000 * spec.size * [...s].length;
-    }
+    function advance(s, spec) { return s ? outline(s, spec).width : 0; }
     function logo(page, spec) {
       const scale = (spec.width * MM) / layout.logo.width;
       for (const part of ['h', 'smc']) {
@@ -390,10 +397,10 @@ var LAYOUT = {"meta":{"name":"HSMC 명함 레이아웃","version":"1.0","source"
     }
     if (sc === 'info-ko') {
       var fc = lockNames() ? 'field locked' : 'field', dis = lockNames() ? ' disabled' : '';
-      return '<h1>국문 정보를 입력해 주세요</h1><div style="display:flex;gap:12px">' +
-        '<div style="flex:0 0 120px"><label class="lbl" for="ko_last">성</label><div class="' + fc + '"><input id="ko_last" data-f="ko_last" type="text" value="' + esc(S.ko_last) + '"' + dis + '></div></div>' +
-        '<div style="flex:1;min-width:0"><label class="lbl" for="ko_first">이름</label><div class="' + fc + '"><input id="ko_first" data-f="ko_first" type="text" value="' + esc(S.ko_first) + '"' + dis + '></div></div></div>' +
-        '<div><span class="lbl">직책</span><button class="field" aria-haspopup="dialog" data-act="openSheet"><span style="color:' + (S.title_ko ? '#191F28' : '#6B7684') + '">' + esc(S.title_ko || '직책을 선택해 주세요') + '</span>' + CHEVRON + '</button></div>';
+      return '<h1>국문 정보를 입력해 주세요</h1><div class="stack20">' +
+        '<div><label class="lbl" for="ko_last">성</label><div class="' + fc + '"><input id="ko_last" data-f="ko_last" type="text" value="' + esc(S.ko_last) + '"' + dis + '></div></div>' +
+        '<div><label class="lbl" for="ko_first">이름</label><div class="' + fc + '"><input id="ko_first" data-f="ko_first" type="text" value="' + esc(S.ko_first) + '"' + dis + '></div></div>' +
+        '<div><span class="lbl">직책</span><button class="field" aria-haspopup="dialog" data-act="openSheet"><span style="color:' + (S.title_ko ? '#191F28' : '#6B7684') + '">' + esc(S.title_ko || '직책을 선택해 주세요') + '</span>' + CHEVRON + '</button></div></div>';
     }
     if (sc === 'info-en') {
       var fc2 = lockNames() ? 'field locked' : 'field', dis2 = lockNames() ? ' disabled' : '';
